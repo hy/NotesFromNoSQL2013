@@ -1,2 +1,363 @@
-[PLACEHOLDER]
+
+_____________________________________________
+"Scaling Mongo at Parse"
+
+Chef cookbook (Parse)
+
+blockdev set too large --> not using all of memory
+blockdev set too small -->
+
+sar -d 1
+. . .  and then look at the tps column!
+
+Use ext4 filesystem not xfs
+
+At the Linux level, be sure to:
+Raise fs limits
+Raise conn limits
+noatime
+nodiratime
+
+journal on  a separate volume (esp. if spinning disks)
+20K hard limit on connections
+
+MongoLab's mongoctl or Mongo Chef Cookbook
+
+Configures EBS raid
+Supports PIOPS
+
+Provisions from snapshots:
+Handle mult. clusters using knife-ev2
+Will not reset padding factors (record growth --> disk movement -->
+incr. padding factor)
+
+snapshot caveats:
+EBS snapshot will "just-in-time" lazy-load blocks from S3
+
+always warm up a secondary before promoting
+  - warm up both index and data
+  - blog.parse.com/2013/03/07/techniques-for-warming
+
+provisioning with initial sync
+
+compacts and repairs your collections and dbs
+
+Hard on your primary -- full table scan of all data
+
+On > 2.2.0 you can sync from a secondary by speed-spamming: rs.syncFrom()
+
+Run continuous compaction on your snapshot node
+
+Finding bad queries:
+db.currentOp()
+mongodb.log
+profiling collection
+
+db.currentOp()
+check the queue size (page yourself if >1000)
+Any index building?
+Sort by num_seconds
+Sort by num_yields, locktype
+Consider adding comments to queries
+Run explain() on queries that are long-running
+
+mongodb.log
+configure with --slowms
+look for high execution time, nscanned, nreturned
+See which queries are holding long locks?
+Match connection id's to IP's
+
+system.profile collection  (nuked on restart)
+
+Failure Scenarios
+
+Mongo will death spiral
+Know what your death spiral looks like. . .
+DO kill queries before the tipping point
+Don't kill internal mongo ops, only queries
+Don't kill writes.
+Don't kill slaving threads
+Don't kill index builds
+
+Never run with even # of votes
+Consider delegating votes to arbiters
+Set priority levels explicitly if you need warmup
+1 Primary, 2 Secondaries, 2 Arbiters
+
+Never kill oplog tailers or other internal db ops, this can crash 2ndaries
+
+Resnapshot off the primary,
+
+_____________________________________________
+
+IBM
+
+"Hardware-optimized Software Solutions"
+
+InfoSphere Collector --> Guardium Repository
+Lightweight Mongo Server monitoring agent
+Separated device to do Audit trail enforcement
+
+Alerts via Syslog to SIEM (HP ArcSight, Tivoli) for immediate action
+
+_____________________________________________
+
+Apache Flume
+
+"High-throughput reliable collectors, with 'pooling' repositories"
+
+Analogy: Add "holding tanks" to your UNIX pipes
+
+THRIFT API for non-Java sources
+
+Source: AVRO, THRIFT, SPOOLDIR, HTTP, JMS, SYSLOGTCP, SYSLOGUDP, NETCAT, EXEC
+
+HTTPclient posts JSON array of events to the server by default
+
+_____________________________________________
+
+NetflixOSS
+
+"How to Win with Cloud"
+"Anything in web services, you can disrupt and profit with NoSQL"
+
+Observe Orient Decide Act (iterate faster, get "inside" your
+competitor's turn radius)
+
+Assume everything you depend on is broken.
+Give developers freedom to respond.
+Decentralize and Automate Ops activities
+DevOps integrated into business org.... BizDevOps
+
+Completely denormalized and polyglot (for which denormalization really helps!)
+50 different Cassandra clusters
+
+BOOKS:
+  Release It!  by Michael Nygord
+  "Circuit breaker"
+  Thinking Systems by Doella Meadows
+  Anti-Fragile
+  Drift into Failure
+
+Netflix streaming (all Open Source -- to scale, don't need to talk to
+any vendors at all)
+
+Denominator tool for region or zone failover AWS Route53 etc.
+CloudHSM (Crypto key store)
+Automate "attack surface" monitoring
+
+_____________________________________________
+
+Cassandra
+
+"Failure is a REALITY"
+"Antifragile is a Practice"
+Antifragile means "things get better with a little chaos and stress
+and exercise" (like muscles)
+Nassim Taleb
+
+Jesse Robbins  a.k.a.  "Master of Disaster" at Amazon.com
+Bringer-of-"Gameday" (pull plugs out at datacenters)
+
+Packet sent from Toyko to London and back is 1/2 sec.
+
+Round-Robin DNS
+
+No replication, just . . .  Shard out the redundancy . . . if a shard
+goes down, we can get the data from 2-3 other machines,
+
+2007 Amazon and the Dynamo paper
+ ? How do we distribute our data?
+ ? How do me maximize uptime?
+ ? How do we keep our data safe?
+http://www.allthingsdistributed.com/2007/10/amazons_dynamo.html
+
+So: multiple servers, uptime and scaling; get closer to users, reduce
+latency; make it a natural, transparent part of the system
+
+Step One: Control your Traffic (DNS control)
+F5 GTM
+A10 Thunder
+Citrix Netscaler
+Cisco ACE
+Barracuda ADC
+
+Cloud: (Route traffic if something fails,
+DYN - Active Failover
+Akamai - Global Traffic Manager
+Amazon Route 53
+
+DIY: Resource fail quickly, try different datacenter (browser-level technique)
+
+Your App:
+ Fail fast -- short-circuit
+ Partial or Eventual Data should be OK
+ Avoid Sticky Sessions
+ Transactions are expensive and probably not needed everywhere
+
+Christos Kalantzis planetcassandra
+
+Embrace the Pod (application units). . .  each stands alone
+
+Do Full-Stack benchmarking
+
+Store state in the browser OR the data tier.  (i.e. the top or bottom)
+EXPECT the application server to fail.
+
+Make your persistence layer resilient
+If your app layer can fail, so can your DB
+Master-Master has less complexity (M-M == Cassandra)
+
+Simian Army (Open Source @Netfilx) Job is to break infrastructure
+Chaos Monkey - shut down random services
+ALWAYS BE FAILING SO THAT IT'S NORMAL!
+http://queue.acm.org/detail.cfm?id=2499552
+
+Cassandra: Dynamo and Big Table papers
+Shared nothing
+Data safe as possibe
+Predictable scaling
+
+Riak also based on Dynamo
+
+Cassandra nodes all participate in a cluster
+Share nothing
+Add or remove nodes as needed.  Need more capacity?  Add a server
+
+Client writes to any node
+Node coordinates with others
+Data replication in parallel
+Replication factor: how many copies of the data?
+
+Client writes local
+Datat syncs across WAN
+Replication factor per datacenter
+
+
+DataStax Drivers for Cassandra
+
+github.com/pmcfadin/c
+
+
+THINK ABOUT THIS!: What if we want to lose statistically REPRESENTATIVE data.
+FRACTAL distribution pattern?
+
+How could we implement NONDISCRIMINATION as a load-balancing criterion?
+
+_____________________________________________
+
+Nathan Marz
+
+Storm Architecture: Bringing realtime to Hadoop
+
+Motto: "Your Code is Wrong"
+ex: reportError  (displays errors in the Storm UI)
+
+
+topologies (infinite jobs)
+
+Nimbus --> Zookeeper --> Supervisor (on each worker)
+
+Error info stored in Zookeeper because that persists state
+
+100,000 errors per second --> self-inflicted DDS attack on Zookeeper
+
+"Treat your code as non-deterministic, 'mostly-working' code"
+
+Your code is wrong --> Your processes will crash --> fault-tolerant proc. man
+
+SO:
+
+Measure and Monitor ("Under what range of inputs do my dependencies
+work" and "Find out the Real Input Space from Real Users")
+
+Design for Immutability.  Data only ever grows, nothing deleted, you
+just add Views to filter things. . .  (Lambda architecture)
+
+Minimize dependencies.  Auto-trim logs.  Self-throttle.  Mitigate
+cascading failures.
+
+_____________________________________________
+
+Oracle
+
+Oracle NoSQL Database Community Edition is now Open Source
+Support for Community Edition $2K / yr.
+Berkeley Database Based
+"Affordable support option" for Startups
+Systems integrator with Sun HW
+"Big Data Appliance for NoSQL database" (Cloudera Dist'n including Hadoop)
+www.nosqlcontest.com
+www.oracle.com/goto/nosql
+(Wow.  The writing is on the wall... *ORACLE* is releasing a free /
+Open Source Key-Value pair storage system!!!)
+
+_____________________________________________
+
+Franz Inc.
+
+ETL Graph Visualizer with Intel Hadoop
+
+MongoDB and Solr already integrated with AllegroGraph
+Want ETL to link to Hadoop also
+
+HDFS --> HBase --> Hive --> Allegrograph
+Mahout --> Allegrograph
+Map/Reduce --> Allegrograph
+
+
+Customers:
+  Apollo (financial group that owns University of Phoenix online)
+
+
+Entity Disambiguation Using Semantic Networks
+
+Fraud Finding in Bank Transactions
+Import about 10% of
+
+Event Ontology:
+type
+list of actors
+place
+start-time --> end-time
+
+
+(SMS msgs count as events.)
+
+Social Network Analysis
+Temporal Reasoning
+
+
+Social Nets:
+
+Geospatial:
+  Index: Where did X happen?
+  Index: How far was event1 from event2?
+
+On a very large scale
+  when things don't fit into memory
+  Millions of events and polygons
+
+Allen's interval logic primitives (13 ways to overlap)
+
+GeoNames DB (JSON, triples)
+
+How to get triples out of Hadoop?
+
+Weblogs, transactions, etc.
+
+JSON XML CVS FLAT PDF or Pipe
+
+GraphBuilder.org Intel Open Source Technology Center
+  (initially worked with GraphLab)
+
+Graph structure mining
+Structure combined with intense semantic info
+
+Take the entire wikidata (36 GB of underlying data that fuels Wikipedia)
+
+Intel will have adapters available next month!
+
+___________________________________________________________
+
 
